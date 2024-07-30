@@ -1,0 +1,46 @@
+name: Main Build
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          audience: sts.amazonaws.com
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::011528260098:role/PetClinicEcrRole
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "corretto"
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          add-job-summary-as-pr-comment: on-failure
+      - name: Run Build
+        env:
+          GRADLE_CREDS: ${{ secrets.GRADLE_CREDS }}
+        run: |
+          echo ${GRADLE_CREDS} | base64 --decode > ~/.gradle/gradle.properties
+          ./gradlew bootJar
+      - uses: docker/build-push-action@v4
+        with:
+          context: ./build/libs/
+          file: ${{ github.workspace }}/Dockerfile
+          load: true
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.login-ecr.outputs.registry }}/petclinic:${{ github.sha }}
