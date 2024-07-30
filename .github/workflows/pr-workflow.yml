@@ -32,3 +32,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: petclinic:${{ github.sha }}
+      - uses: aquasecurity/trivy-action@master
+        id: scan
+        with:
+          ignore-unfixed: true
+          exit-code: 1
+          severity: "CRITICAL,HIGH"
+          output: "vulnerabilities.table"
+          image-ref: petclinic:${{ github.sha }}
+      - uses: actions/github-script@v7
+        if: ${{ failure() && steps.scan.conclusion == 'failure' }}
+        with:
+          script: |
+            const { readFileSync } = require("fs");
+
+            const text = readFileSync("vulnerabilities.table");
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: "👋 We found the following vulnerabilities: \n\n\n```\n" + text + "\n```"
+            });
