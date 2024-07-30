@@ -23,3 +23,12 @@ jobs:
         run: |
           echo ${GRADLE_CREDS} | base64 --decode > ~/.gradle/gradle.properties
           ./gradlew build
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v4
+        with:
+          context: ./build/libs/
+          file: ${{ github.workspace }}/Dockerfile
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: petclinic:${{ github.sha }}
